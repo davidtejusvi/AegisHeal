@@ -1,0 +1,30 @@
+---
+# PodDisruptionBudget — anomaly-detector
+# Guarantees at least 1 pod stays up during voluntary disruptions (node drain, upgrades)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: anomaly-detector-pdb
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: anomaly-detector
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: anomaly-detector
+
+---
+# PodDisruptionBudget — remediation-engine
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: remediation-engine-pdb
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: remediation-engine
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: remediation-engine

@@ -1,0 +1,51 @@
+---
+# anomaly-detector non-secret configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anomaly-detector-config
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: anomaly-detector
+data:
+  AWS_REGION: "us-east-1"
+  PROMETHEUS_URL: "http://prometheus-service.monitoring-platform.svc.cluster.local:9090"
+  DB_HOST: "postgres-service.monitoring-platform.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "aimonitor"
+  DB_USER: "aimonitor"
+  # Detection thresholds
+  ANOMALY_THRESHOLD_CRITICAL: "0.9"
+  ANOMALY_THRESHOLD_HIGH: "0.7"
+  ANOMALY_THRESHOLD_MEDIUM: "0.5"
+  # Model settings
+  ISOLATION_FOREST_CONTAMINATION: "0.05"
+  LSTM_SEQUENCE_LENGTH: "20"
+  LSTM_HIDDEN_SIZE: "64"
+  METRICS_WINDOW_SECONDS: "300"
+  METRICS_RESOLUTION_SECONDS: "60"
+
+---
+# remediation-engine non-secret configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: remediation-engine-config
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: remediation-engine
+data:
+  AWS_REGION: "us-east-1"
+  DB_HOST: "postgres-service.monitoring-platform.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "aimonitor"
+  DB_USER: "aimonitor"
+  K8S_NAMESPACE: "monitoring-platform"
+  K8S_IN_CLUSTER: "true"
+  DRY_RUN: "false"
+  ACTION_TIMEOUT_SECONDS: "120"
+  MAX_SCALE_REPLICAS: "10"
+  LAMBDA_AUTO_SCALER: "ai-monitor-auto-scaler"
+  LAMBDA_INSTANCE_RESTARTER: "ai-monitor-instance-restarter"
+  SSM_RESTART_SERVICE: "AI-Monitor-RestartService"
+  SSM_CLEAR_CACHE: "AI-Monitor-ClearCache"

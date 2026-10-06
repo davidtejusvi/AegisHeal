@@ -1,0 +1,58 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring-platform
+
+bases:
+  - ../../base
+
+# Dev: reduce replicas and resource limits to save cost
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: anomaly-detector
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment
+      name: remediation-engine
+
+  # Relax HPA lower bound for dev
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+    target:
+      kind: HorizontalPodAutoscaler
+      name: anomaly-detector-hpa
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+    target:
+      kind: HorizontalPodAutoscaler
+      name: remediation-engine-hpa
+
+  # Enable dry-run mode in dev so no real AWS actions are taken
+  - patch: |-
+      - op: replace
+        path: /data/DRY_RUN
+        value: "true"
+    target:
+      kind: ConfigMap
+      name: remediation-engine-config
+
+commonLabels:
+  environment: dev
+
+images:
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/anomaly-detector
+    newTag: dev-latest
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/remediation-engine
+    newTag: dev-latest

@@ -1,0 +1,67 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring-platform
+
+bases:
+  - ../../base
+
+# Prod: increase replicas and resource requests/limits
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: anomaly-detector
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: remediation-engine
+
+  # Tighten HPA for prod
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 12
+    target:
+      kind: HorizontalPodAutoscaler
+      name: anomaly-detector-hpa
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 8
+    target:
+      kind: HorizontalPodAutoscaler
+      name: remediation-engine-hpa
+
+  # Prod ingress — external facing with prod domain
+  - patch: |-
+      - op: replace
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1scheme
+        value: internet-facing
+      - op: replace
+        path: /spec/rules/0/host
+        value: aegisheal.prod.example.com
+    target:
+      kind: Ingress
+      name: aegisheal-ingress
+
+commonLabels:
+  environment: prod
+
+images:
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/anomaly-detector
+    newTag: stable
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/remediation-engine
+    newTag: stable

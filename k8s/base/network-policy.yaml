@@ -1,0 +1,136 @@
+---
+# NetworkPolicy — anomaly-detector
+# Allows:
+#   - Inbound: remediation-engine → port 8000 (POST /analyze)
+#   - Inbound: Prometheus scraper → port 8000 /metrics
+#   - Inbound: ALB Ingress controller → port 8000 (API gateway)
+#   - Outbound: egress to DB (5432), Prometheus (9090), AWS APIs (443)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: anomaly-detector-netpol
+  namespace: monitoring-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: anomaly-detector
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from remediation-engine
+    - from:
+        - podSelector:
+            matchLabels:
+              app: remediation-engine
+      ports:
+        - port: 8000
+    # Allow Prometheus scraping (kube-prometheus stack uses label app.kubernetes.io/name=prometheus)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8000
+    # Allow AWS Load Balancer Controller / Ingress traffic
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 8000
+
+  egress:
+    # PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+    # Prometheus
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9090
+    # AWS APIs (CloudWatch, SSM, Lambda, etc.) via HTTPS
+    - ports:
+        - port: 443
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+---
+# NetworkPolicy — remediation-engine
+# Allows:
+#   - Inbound: alert-processor Lambda / internal callers → port 8001
+#   - Inbound: Prometheus scraper → port 8001 /metrics
+#   - Outbound: anomaly-detector (80), DB (5432), AWS APIs (443), Kubernetes API (6443)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: remediation-engine-netpol
+  namespace: monitoring-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: remediation-engine
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8001
+    # ALB / Ingress
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 8001
+
+  egress:
+    # Call anomaly-detector
+    - to:
+        - podSelector:
+            matchLabels:
+              app: anomaly-detector
+      ports:
+        - port: 8000
+    # PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+    # AWS APIs (Lambda, CloudWatch, SSM, EC2 ASG)
+    - ports:
+        - port: 443
+    # Kubernetes API server
+    - ports:
+        - port: 6443
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

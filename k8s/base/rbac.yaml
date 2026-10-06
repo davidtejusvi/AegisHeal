@@ -1,0 +1,91 @@
+---
+# ServiceAccount for anomaly-detector
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: anomaly-detector
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: anomaly-detector
+    app.kubernetes.io/component: ml-service
+  annotations:
+    # Replace with your actual IAM role ARN after Terraform deploy
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/ai-monitoring-platform-anomaly-detector"
+
+---
+# ServiceAccount for remediation-engine
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: remediation-engine
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: remediation-engine
+    app.kubernetes.io/component: remediation-service
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/ai-monitoring-platform-remediation-engine"
+
+---
+# ClusterRole: remediation-engine needs to read/patch Deployments for auto-scaling
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: remediation-engine-role
+  labels:
+    app.kubernetes.io/name: remediation-engine
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "endpoints", "nodes"]
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: remediation-engine-binding
+  labels:
+    app.kubernetes.io/name: remediation-engine
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: remediation-engine-role
+subjects:
+  - kind: ServiceAccount
+    name: remediation-engine
+    namespace: monitoring-platform
+
+---
+# Role for anomaly-detector: read ConfigMaps & Secrets in its own namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: anomaly-detector-role
+  namespace: monitoring-platform
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: anomaly-detector-binding
+  namespace: monitoring-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: anomaly-detector-role
+subjects:
+  - kind: ServiceAccount
+    name: anomaly-detector
+    namespace: monitoring-platform

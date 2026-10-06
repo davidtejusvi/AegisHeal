@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: anomaly-detector-service
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: anomaly-detector
+    app.kubernetes.io/component: ml-service
+    app.kubernetes.io/part-of: aegisheal
+  annotations:
+    # Let Prometheus ServiceMonitor discover this service
+    prometheus.io/scrape: "true"
+    prometheus.io/port:   "8000"
+    prometheus.io/path:   "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: anomaly-detector
+  ports:
+    - name: http
+      port: 80
+      targetPort: http          # named port on the container (8000)
+      protocol: TCP

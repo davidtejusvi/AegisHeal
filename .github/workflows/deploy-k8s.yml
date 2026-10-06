@@ -1,0 +1,137 @@
+name: Deploy to EKS
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+    paths:
+      - "k8s/**"
+      - "src/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev | prod)"
+        required: true
+        default: dev
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  # ── Validate manifests ────────────────────────────────────────────────────
+  validate:
+    name: Validate K8s manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeval
+        run: |
+          wget -qO- https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz \
+            | tar xvz && sudo mv kubeval /usr/local/bin/
+
+      - name: Validate base manifests
+        run: |
+          kubeval --strict --ignore-missing-schemas k8s/base/*.yaml
+
+      - name: Install kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Build dev overlay (dry-run)
+        run: kustomize build k8s/overlays/dev > /dev/null
+
+      - name: Build prod overlay (dry-run)
+        run: kustomize build k8s/overlays/prod > /dev/null
+
+  # ── Build & push Docker images ───────────────────────────────────────────
+  build:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      anomaly_tag: ${{ steps.meta.outputs.anomaly_tag }}
+      remediation_tag: ${{ steps.meta.outputs.remediation_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: meta
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "anomaly_tag=${SHORT_SHA}"     >> $GITHUB_OUTPUT
+          echo "remediation_tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build & push anomaly-detector
+        uses: docker/build-push-action@v5
+        with:
+          context: src/anomaly-detector
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:${{ steps.meta.outputs.anomaly_tag }}
+            ${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:latest
+
+      - name: Build & push remediation-engine
+        uses: docker/build-push-action@v5
+        with:
+          context: src/remediation-engine
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${{ steps.meta.outputs.remediation_tag }}
+            ${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:latest
+
+  # ── Deploy ───────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: Set up kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ai-monitoring-platform-${{ github.event.inputs.environment || 'dev' }}-eks
+
+      - name: Install kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Update image tags in overlay
+        env:
+          ENV: ${{ github.event.inputs.environment || 'dev' }}
+          TAG: ${{ needs.build.outputs.anomaly_tag }}
+        run: |
+          cd k8s/overlays/${ENV}
+          kustomize edit set image \
+            "${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector=${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:${TAG}" \
+            "${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine=${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${TAG}"
+
+      - name: Apply manifests
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          kustomize build k8s/overlays/${ENV} | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/anomaly-detector  -n monitoring-platform --timeout=5m
+          kubectl rollout status deployment/remediation-engine -n monitoring-platform --timeout=5m
