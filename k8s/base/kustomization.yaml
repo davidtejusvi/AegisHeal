@@ -18,6 +18,7 @@ resources:
   - network-policy.yaml
   - ingress.yaml
   - prometheus.yaml
+  - grafana.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: aegisheal

@@ -1,0 +1,479 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/part-of: aegisheal
+    app.kubernetes.io/component: grafana
+data:
+  grafana.ini: |
+    [server]
+    root_url = %(protocol)s://%(domain)s:%(http_port)s/
+    [security]
+    admin_user = admin
+    [dashboards]
+    default_home_dashboard_path = /var/lib/grafana/dashboards/aegisheal.json
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-service.monitoring-platform.svc.cluster.local:9090
+        isDefault: true
+        uid: prometheus
+        editable: false
+  dashboardproviders.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: AegisHeal
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/part-of: aegisheal
+    app.kubernetes.io/component: grafana
+data:
+  aegisheal.json: |
+    {
+      "__inputs": [
+        {
+          "name": "datasource",
+          "label": "Datasource",
+          "description": "",
+          "type": "datasource",
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
+        }
+      ],
+      "__requires": [
+        {
+          "type": "grafana",
+          "id": "grafana",
+          "name": "Grafana",
+          "version": "10.4.2"
+        },
+        {
+          "type": "datasource",
+          "id": "prometheus",
+          "name": "Prometheus",
+          "version": "1.0.0"
+        }
+      ],
+      "uid": "aegisheal-main",
+      "title": "AegisHeal \u2014 Platform Overview",
+      "description": "Platform-wide observability for AegisHeal anomaly detection and remediation",
+      "tags": ["aegisheal", "platform"],
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Anomaly Score over Time",
+          "type": "graph",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "rate(anomaly_analyze_requests_total[5m])",
+              "legendFormat": "Anomaly Request Rate",
+              "refId": "A"
+            }
+          ],
+          "options": {},
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "unit": "reqps"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Anomalies Detected by Severity",
+          "type": "barchart",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum by (severity) (anomaly_detected_total)",
+              "legendFormat": "{{severity}}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "orientation": "vertical",
+            "xField": "severity",
+            "barWidth": 0.7,
+            "groupWidth": 0.7,
+            "fillOpacity": 80
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "unit": "short"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "title": "Remediation Incidents Total",
+          "type": "stat",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 0, "y": 8, "w": 6, "h": 6 },
+          "targets": [
+            {
+              "expr": "remediation_incidents_total",
+              "legendFormat": "Total Incidents",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"]
+            },
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "red", "value": 100 }
+                ]
+              },
+              "unit": "short"
+            }
+          }
+        },
+        {
+          "id": 4,
+          "title": "Auto-Resolution Rate %",
+          "type": "gauge",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 6, "y": 8, "w": 6, "h": 6 },
+          "targets": [
+            {
+              "expr": "remediation_auto_resolved_total / remediation_incidents_total * 100",
+              "legendFormat": "Auto-Resolution Rate",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"]
+            },
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "green", "value": 80 }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "MTTD Histogram (Heatmap)",
+          "type": "heatmap",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 6 },
+          "targets": [
+            {
+              "expr": "rate(remediation_mttd_seconds_bucket[5m])",
+              "legendFormat": "{{le}}",
+              "refId": "A",
+              "format": "heatmap"
+            }
+          ],
+          "options": {
+            "calculate": false,
+            "color": {
+              "mode": "scheme",
+              "scheme": "Oranges",
+              "steps": 64
+            },
+            "yAxis": {
+              "unit": "s"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          }
+        },
+        {
+          "id": 6,
+          "title": "MTTR Histogram (Heatmap)",
+          "type": "heatmap",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 0, "y": 14, "w": 12, "h": 6 },
+          "targets": [
+            {
+              "expr": "rate(remediation_mttr_seconds_bucket[5m])",
+              "legendFormat": "{{le}}",
+              "refId": "A",
+              "format": "heatmap"
+            }
+          ],
+          "options": {
+            "calculate": false,
+            "color": {
+              "mode": "scheme",
+              "scheme": "Blues",
+              "steps": 64
+            },
+            "yAxis": {
+              "unit": "s"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          }
+        },
+        {
+          "id": 7,
+          "title": "Analyze Endpoint Latency p50",
+          "type": "graph",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 12, "y": 14, "w": 12, "h": 6 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{handler=\"/analyze\"}[5m])) by (le))",
+              "legendFormat": "p50 latency",
+              "refId": "A"
+            }
+          ],
+          "options": {},
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "unit": "s"
+            }
+          }
+        },
+        {
+          "id": 8,
+          "title": "Analyze Endpoint Latency p95",
+          "type": "graph",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 0, "y": 20, "w": 12, "h": 6 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{handler=\"/analyze\"}[5m])) by (le))",
+              "legendFormat": "p95 latency",
+              "refId": "A"
+            }
+          ],
+          "options": {},
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "unit": "s"
+            }
+          }
+        },
+        {
+          "id": 9,
+          "title": "Active Incidents",
+          "type": "gauge",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 12, "y": 20, "w": 6, "h": 6 },
+          "targets": [
+            {
+              "expr": "remediation_active_incidents",
+              "legendFormat": "Active Incidents",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"]
+            },
+            "orientation": "auto",
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "red", "value": 10 }
+                ]
+              },
+              "unit": "short",
+              "min": 0
+            }
+          }
+        },
+        {
+          "id": 10,
+          "title": "K8s Pod Restarts",
+          "type": "graph",
+          "datasource": "${datasource}",
+          "gridPos": { "x": 18, "y": 20, "w": 6, "h": 6 },
+          "targets": [
+            {
+              "expr": "kube_pod_container_status_restarts_total{namespace=\"monitoring-platform\"}",
+              "legendFormat": "{{pod}} / {{container}}",
+              "refId": "A"
+            }
+          ],
+          "options": {},
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "unit": "short"
+            }
+          }
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring-platform
+  labels:
+    app: grafana
+    app.kubernetes.io/part-of: aegisheal
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+        app.kubernetes.io/part-of: aegisheal
+    spec:
+      securityContext:
+        fsGroup: 472
+        supplementalGroups:
+          - 0
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.4.2
+          ports:
+            - containerPort: 3000
+              name: grafana
+              protocol: TCP
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: grafana-config
+              mountPath: /etc/grafana/grafana.ini
+              subPath: grafana.ini
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/datasources/datasources.yaml
+              subPath: datasources.yaml
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards/dashboardproviders.yaml
+              subPath: dashboardproviders.yaml
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: grafana-config
+          configMap:
+            name: grafana-dashboards-config
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring-platform
+  labels:
+    app: grafana
+    app.kubernetes.io/part-of: aegisheal
+    app.kubernetes.io/component: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - name: grafana
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/part-of: aegisheal
+    app.kubernetes.io/component: grafana
+type: Opaque
+data:
+  # base64("admin") — REPLACE before deploying to production
+  admin-password: YWRtaW4=
