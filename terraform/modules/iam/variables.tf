@@ -19,3 +19,15 @@ variable "aws_region" {
   type        = string
   default     = "us-east-1"
 }
+
+variable "oidc_provider_arn" {
+  description = "ARN of the EKS OIDC provider (for IRSA trust policies)"
+  type        = string
+  default     = ""
+}
+
+variable "cluster_oidc_issuer_url" {
+  description = "OIDC issuer URL of the EKS cluster (without https://, used as condition variable)"
+  type        = string
+  default     = ""
+}

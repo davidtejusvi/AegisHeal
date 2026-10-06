@@ -362,3 +362,88 @@ resource "aws_iam_policy" "cross_service" {
     Environment = var.environment
   }
 }
+
+# ---------------------------------------------------------------------------
+# IRSA locals
+# ---------------------------------------------------------------------------
+locals {
+  oidc_provider_url = replace(var.cluster_oidc_issuer_url, "https://", "")
+}
+
+# ---------------------------------------------------------------------------
+# IRSA Role — anomaly-detector
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "anomaly_detector_irsa_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider_url}:sub"
+      values   = ["system:serviceaccount:monitoring-platform:anomaly-detector"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider_url}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "anomaly_detector_irsa" {
+  name               = "${local.name_prefix}-anomaly-detector-irsa"
+  assume_role_policy = data.aws_iam_policy_document.anomaly_detector_irsa_assume.json
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "anomaly_detector_irsa" {
+  role       = aws_iam_role.anomaly_detector_irsa.name
+  policy_arn = aws_iam_policy.cross_service.arn
+}
+
+# ---------------------------------------------------------------------------
+# IRSA Role — remediation-engine
+# ---------------------------------------------------------------------------
+data "aws_iam_policy_document" "remediation_engine_irsa_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [var.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider_url}:sub"
+      values   = ["system:serviceaccount:monitoring-platform:remediation-engine"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider_url}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "remediation_engine_irsa" {
+  name               = "${local.name_prefix}-remediation-engine-irsa"
+  assume_role_policy = data.aws_iam_policy_document.remediation_engine_irsa_assume.json
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "remediation_engine_irsa" {
+  role       = aws_iam_role.remediation_engine_irsa.name
+  policy_arn = aws_iam_policy.cross_service.arn
+}

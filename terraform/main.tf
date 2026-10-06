@@ -21,14 +21,21 @@ module "vpc" {
 }
 
 # ---------------------------------------------------------------------------
-# IAM Module  (no VPC dependency — create early so roles are available)
+# IAM Module
 # ---------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
 module "iam" {
   source = "./modules/iam"
 
-  project_name   = var.project_name
-  environment    = var.environment
-  aws_region     = var.aws_region
+  project_name            = var.project_name
+  environment             = var.environment
+  aws_region              = var.aws_region
+  aws_account_id          = data.aws_caller_identity.current.account_id
+  oidc_provider_arn       = module.eks.oidc_provider_arn
+  cluster_oidc_issuer_url = module.eks.cluster_oidc_issuer_url
+
+  depends_on = [module.eks]
 }
 
 # ---------------------------------------------------------------------------
@@ -37,14 +44,14 @@ module "iam" {
 module "eks" {
   source = "./modules/eks"
 
-  cluster_name        = "${local.name_prefix}-eks"
-  vpc_id              = module.vpc.vpc_id
-  private_subnet_ids  = module.vpc.private_subnet_ids
-  node_instance_type  = var.eks_node_instance_type
-  environment         = var.environment
-  project_name        = var.project_name
+  cluster_name       = "${local.name_prefix}-eks"
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  node_instance_type = var.eks_node_instance_type
+  environment        = var.environment
+  project_name       = var.project_name
 
-  depends_on = [module.vpc, module.iam]
+  depends_on = [module.vpc]
 }
 
 # ---------------------------------------------------------------------------
