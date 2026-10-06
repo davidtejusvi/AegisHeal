@@ -16,6 +16,7 @@ resources:
   - hpa.yaml
   - pdb.yaml
   - network-policy.yaml
+  - dashboard-deployment.yaml
   - ingress.yaml
   - prometheus.yaml
   - grafana.yaml

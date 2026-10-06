@@ -12,7 +12,7 @@ metadata:
   annotations:
     # ALB controller
     kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internal        # change to internet-facing for public
+    alb.ingress.kubernetes.io/scheme: internal # change to internet-facing for public
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
@@ -30,7 +30,7 @@ metadata:
       access_logs.s3.prefix=aegisheal
 spec:
   rules:
-    - host: aegisheal.internal.example.com       # replace with your domain
+    - host: aegisheal.internal.example.com # replace with your domain
       http:
         paths:
           # Anomaly Detector API
@@ -49,3 +49,11 @@ spec:
                 name: remediation-engine-service
                 port:
                   name: http
+          # Dashboard
+          - path: /dashboard
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard-service
+                port:
+                  number: 80

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: aegisheal
+  labels:
+    app: dashboard
+    version: latest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/dashboard:latest
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          env:
+            - name: VITE_ANOMALY_DETECTOR_URL
+              value: "/api/anomaly"
+            - name: VITE_REMEDIATION_ENGINE_URL
+              value: "/api/remediation"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-service
+  namespace: aegisheal
+  labels:
+    app: dashboard
+spec:
+  type: ClusterIP
+  selector:
+    app: dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
