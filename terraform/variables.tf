@@ -49,3 +49,9 @@ variable "alert_email" {
     error_message = "alert_email must be a valid email address."
   }
 }
+
+variable "github_org" {
+  description = "GitHub organization or user name owning the AegisHeal repository (used in OIDC trust policy)"
+  type        = string
+  default     = "your-org"
+}
