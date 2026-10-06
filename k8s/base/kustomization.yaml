@@ -8,6 +8,7 @@ resources:
   - rbac.yaml
   - configmap.yaml
   - secret.yaml
+  - cluster-secret-store.yaml
   - anomaly-detector-deployment.yaml
   - anomaly-detector-service.yaml
   - remediation-engine-deployment.yaml
