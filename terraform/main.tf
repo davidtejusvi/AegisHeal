@@ -48,6 +48,9 @@ module "eks" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
   node_instance_type = var.eks_node_instance_type
+  node_desired_count = var.eks_node_desired_count
+  node_min_count     = var.eks_node_min_count
+  node_max_count     = var.eks_node_max_count
   environment        = var.environment
   project_name       = var.project_name
 
@@ -99,4 +102,8 @@ module "lambda" {
   sns_alert_topic_arn    = module.cloudwatch.sns_topic_arn
 
   depends_on = [module.vpc, module.cloudwatch, module.rds]
+
+  # enable_ai_remediation gates whether Lambda functions are created.
+  # Passed through to the lambda module so dev/staging can disable real actions.
+  count = var.enable_ai_remediation ? 1 : 0
 }

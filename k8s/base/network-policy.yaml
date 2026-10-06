@@ -134,3 +134,52 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+
+---
+# NetworkPolicy — dashboard
+# Allows:
+#   - Inbound: ALB Ingress controller → port 80
+# Outbound: calls anomaly-detector (80) and remediation-engine (80) via nginx proxy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dashboard-netpol
+  namespace: monitoring-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # ALB / Ingress traffic
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 80
+
+  egress:
+    # Call anomaly-detector via ClusterIP service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: anomaly-detector
+      ports:
+        - port: 8000
+    # Call remediation-engine via ClusterIP service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: remediation-engine
+      ports:
+        - port: 8001
+    # DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

@@ -181,9 +181,9 @@ resource "aws_eks_node_group" "main" {
   instance_types  = [var.node_instance_type]
 
   scaling_config {
-    desired_size = 2
-    min_size     = 1
-    max_size     = 5
+    desired_size = var.node_desired_count
+    min_size     = var.node_min_count
+    max_size     = var.node_max_count
   }
 
   update_config {
@@ -350,6 +350,12 @@ resource "aws_iam_role_policy" "cluster_autoscaler" {
 # ---------------------------------------------------------------------------
 # aws-auth ConfigMap  (grants node role + optional admin access)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# aws-auth ConfigMap  (grants node role + cluster autoscaler access)
+# NOTE: This resource uses the Kubernetes provider which must be configured
+# at the root module level (provider.tf). Modules inherit providers from
+# the root — no explicit provider block needed here.
+# ---------------------------------------------------------------------------
 resource "kubernetes_config_map_v1_data" "aws_auth" {
   metadata {
     name      = "aws-auth"
@@ -386,5 +392,27 @@ resource "aws_cloudwatch_log_group" "eks" {
   tags = {
     Project     = var.project_name
     Environment = var.environment
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Provider requirements — inherited from root module
+# Declaring here ensures `terraform validate` knows which providers this
+# module relies on and avoids "provider not available" errors.
+# ---------------------------------------------------------------------------
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 4.0"
+    }
   }
 }

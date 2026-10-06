@@ -3,11 +3,11 @@ kind: Kustomization
 
 namespace: monitoring-platform
 
-bases:
+resources:
   - ../../base
 
-# Prod: increase replicas and resource requests/limits
 patches:
+  # Prod: 3 replicas for all backend services
   - patch: |-
       - op: replace
         path: /spec/replicas
@@ -15,6 +15,7 @@ patches:
     target:
       kind: Deployment
       name: anomaly-detector
+
   - patch: |-
       - op: replace
         path: /spec/replicas
@@ -23,7 +24,16 @@ patches:
       kind: Deployment
       name: remediation-engine
 
-  # Tighten HPA for prod
+  # Prod: 2 replicas for dashboard
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: dashboard
+
+  # Tighten HPA bounds for prod traffic
   - patch: |-
       - op: replace
         path: /spec/minReplicas
@@ -34,6 +44,7 @@ patches:
     target:
       kind: HorizontalPodAutoscaler
       name: anomaly-detector-hpa
+
   - patch: |-
       - op: replace
         path: /spec/minReplicas
@@ -45,7 +56,7 @@ patches:
       kind: HorizontalPodAutoscaler
       name: remediation-engine-hpa
 
-  # Prod ingress — external facing with prod domain
+  # Prod ingress: internet-facing ALB with prod domain
   - patch: |-
       - op: replace
         path: /metadata/annotations/alb.ingress.kubernetes.io~1scheme
@@ -57,11 +68,10 @@ patches:
       kind: Ingress
       name: aegisheal-ingress
 
-commonLabels:
-  environment: prod
-
 images:
   - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/anomaly-detector
     newTag: stable
   - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/remediation-engine
+    newTag: stable
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/dashboard
     newTag: stable

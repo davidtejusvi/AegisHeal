@@ -39,3 +39,21 @@ variable "alert_email" {
   type        = string
   default     = "dev-alerts@example.com"
 }
+
+variable "eks_node_desired_count" {
+  description = "Desired number of EKS worker nodes (dev)"
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_min_count" {
+  description = "Minimum number of EKS worker nodes (dev)"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_max_count" {
+  description = "Maximum number of EKS worker nodes (dev)"
+  type        = number
+  default     = 4
+}

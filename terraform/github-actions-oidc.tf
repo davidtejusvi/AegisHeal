@@ -40,8 +40,8 @@ data "aws_iam_policy_document" "github_actions_assume" {
 }
 
 resource "aws_iam_role" "github_actions_deploy" {
-  name               = "${local.name_prefix}-github-actions-deploy"
-  assume_role_policy = data.aws_iam_policy_document.github_actions_assume.json
+  name                 = "${local.name_prefix}-github-actions-deploy"
+  assume_role_policy   = data.aws_iam_policy_document.github_actions_assume.json
   max_session_duration = 3600
 
   tags = {
@@ -108,9 +108,4 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
   name   = "${local.name_prefix}-github-actions-deploy-policy"
   role   = aws_iam_role.github_actions_deploy.id
   policy = data.aws_iam_policy_document.github_actions_deploy.json
-}
-
-output "github_actions_deploy_role_arn" {
-  description = "ARN of the GitHub Actions deploy IAM role — set as AWS_DEPLOY_ROLE_ARN secret in GitHub"
-  value       = aws_iam_role.github_actions_deploy.arn
 }

@@ -80,12 +80,16 @@ case "$SERVICE" in
   remediation-engine)
     build_push remediation-engine
     ;;
+  dashboard)
+    build_push dashboard
+    ;;
   all)
     build_push anomaly-detector
     build_push remediation-engine
+    build_push dashboard
     ;;
   *)
-    error "Unknown service '$SERVICE'. Use: anomaly-detector | remediation-engine | all"
+    error "Unknown service '$SERVICE'. Use: anomaly-detector | remediation-engine | dashboard | all"
     ;;
 esac
 

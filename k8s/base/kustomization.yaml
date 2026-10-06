@@ -21,6 +21,6 @@ resources:
   - prometheus.yaml
   - grafana.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: aegisheal
-  app.kubernetes.io/managed-by: kustomize
+# NOTE: commonLabels removed — it injects labels onto CRDs (ClusterSecretStore,
+# ExternalSecret) and Namespace which can cause apply errors with strict admission
+# webhooks. Labels are set per-resource in each manifest instead.

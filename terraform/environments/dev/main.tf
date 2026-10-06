@@ -39,6 +39,9 @@ module "platform" {
   aws_region             = var.aws_region
   vpc_cidr               = var.vpc_cidr
   eks_node_instance_type = var.eks_node_instance_type
+  eks_node_desired_count = var.eks_node_desired_count
+  eks_node_min_count     = var.eks_node_min_count
+  eks_node_max_count     = var.eks_node_max_count
   enable_ai_remediation  = var.enable_ai_remediation
   alert_email            = var.alert_email
 }

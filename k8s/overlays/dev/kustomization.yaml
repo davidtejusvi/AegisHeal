@@ -3,11 +3,11 @@ kind: Kustomization
 
 namespace: monitoring-platform
 
-bases:
+resources:
   - ../../base
 
-# Dev: reduce replicas and resource limits to save cost
 patches:
+  # Dev: single replica for cost savings
   - patch: |-
       - op: replace
         path: /spec/replicas
@@ -15,6 +15,7 @@ patches:
     target:
       kind: Deployment
       name: anomaly-detector
+
   - patch: |-
       - op: replace
         path: /spec/replicas
@@ -31,6 +32,7 @@ patches:
     target:
       kind: HorizontalPodAutoscaler
       name: anomaly-detector-hpa
+
   - patch: |-
       - op: replace
         path: /spec/minReplicas
@@ -48,11 +50,10 @@ patches:
       kind: ConfigMap
       name: remediation-engine-config
 
-commonLabels:
-  environment: dev
-
 images:
   - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/anomaly-detector
     newTag: dev-latest
   - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/remediation-engine
+    newTag: dev-latest
+  - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/aegisheal/dashboard
     newTag: dev-latest

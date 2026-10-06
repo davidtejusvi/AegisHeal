@@ -54,26 +54,22 @@ jobs:
       id-token: write
       contents: read
     outputs:
-      anomaly_tag: ${{ steps.meta.outputs.anomaly_tag }}
-      remediation_tag: ${{ steps.meta.outputs.remediation_tag }}
+      image_tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{secrets.AWS_DEPLOY_ROLE_ARN}}
-          aws-region: ${{env.AWS_REGION}}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tags
+      - name: Set image tag
         id: meta
-        run: |
-          SHORT_SHA=${GITHUB_SHA::7}
-          echo "anomaly_tag=${SHORT_SHA}"     >> $GITHUB_OUTPUT
-          echo "remediation_tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+        run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Build & push anomaly-detector
         uses: docker/build-push-action@v5
@@ -81,7 +77,7 @@ jobs:
           context: src/anomaly-detector
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:${{ steps.meta.outputs.anomaly_tag }}
+            ${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:${{ steps.meta.outputs.tag }}
             ${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:latest
 
       - name: Build & push remediation-engine
@@ -90,8 +86,17 @@ jobs:
           context: src/remediation-engine
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${{ steps.meta.outputs.remediation_tag }}
+            ${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${{ steps.meta.outputs.tag }}
             ${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:latest
+
+      - name: Build & push dashboard
+        uses: docker/build-push-action@v5
+        with:
+          context: src/dashboard
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/aegisheal/dashboard:${{ steps.meta.outputs.tag }}
+            ${{ env.ECR_REGISTRY }}/aegisheal/dashboard:latest
 
   # ── Deploy ───────────────────────────────────────────────────────────────
   deploy:
@@ -108,8 +113,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{secrets.AWS_DEPLOY_ROLE_ARN}}
-          aws-region: ${{env.AWS_REGION}}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up kubeconfig for EKS
         run: |
@@ -123,19 +128,21 @@ jobs:
       - name: Update image tags in overlay
         env:
           ENV: ${{ github.event.inputs.environment || 'dev' }}
-          TAG: ${{ needs.build.outputs.anomaly_tag }}
+          TAG: ${{ needs.build.outputs.image_tag }}
         run: |
           cd k8s/overlays/${ENV}
           kustomize edit set image \
             "${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector=${{ env.ECR_REGISTRY }}/aegisheal/anomaly-detector:${TAG}" \
-            "${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine=${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${TAG}"
+            "${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine=${{ env.ECR_REGISTRY }}/aegisheal/remediation-engine:${TAG}" \
+            "${{ env.ECR_REGISTRY }}/aegisheal/dashboard=${{ env.ECR_REGISTRY }}/aegisheal/dashboard:${TAG}"
 
       - name: Apply manifests
         run: |
           ENV=${{ github.event.inputs.environment || 'dev' }}
           kustomize build k8s/overlays/${ENV} | kubectl apply -f -
 
-      - name: Wait for rollout
+      - name: Wait for rollouts
         run: |
-          kubectl rollout status deployment/anomaly-detector  -n monitoring-platform --timeout=5m
-          kubectl rollout status deployment/remediation-engine -n monitoring-platform --timeout=5m
+          kubectl rollout status deployment/anomaly-detector   -n monitoring-platform --timeout=5m
+          kubectl rollout status deployment/remediation-engine  -n monitoring-platform --timeout=5m
+          kubectl rollout status deployment/dashboard           -n monitoring-platform --timeout=3m

@@ -28,3 +28,18 @@ spec:
   selector:
     matchLabels:
       app: remediation-engine
+
+---
+# PodDisruptionBudget — dashboard
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dashboard-pdb
+  namespace: monitoring-platform
+  labels:
+    app.kubernetes.io/name: dashboard
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dashboard

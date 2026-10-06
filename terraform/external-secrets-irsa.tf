@@ -1,8 +1,11 @@
-# Drop this file into terraform/ and run terraform apply after EKS is up
-# This creates the IRSA role for the external-secrets ServiceAccount.
+# ---------------------------------------------------------------------------
+# IRSA Role for External Secrets Operator
+# Applied automatically as part of the root Terraform module.
+# Grants ESO permission to read AegisHeal secrets from AWS Secrets Manager.
+# ---------------------------------------------------------------------------
 
 locals {
-  eso_oidc_provider_url = replace(module.eks.oidc_provider_arn, "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/", "")
+  eso_oidc_url = replace(module.eks.cluster_oidc_issuer_url, "https://", "")
 }
 
 data "aws_iam_policy_document" "external_secrets_assume" {
@@ -15,12 +18,12 @@ data "aws_iam_policy_document" "external_secrets_assume" {
     }
     condition {
       test     = "StringEquals"
-      variable = "${local.eso_oidc_provider_url}:sub"
+      variable = "${local.eso_oidc_url}:sub"
       values   = ["system:serviceaccount:external-secrets:external-secrets"]
     }
     condition {
       test     = "StringEquals"
-      variable = "${local.eso_oidc_provider_url}:aud"
+      variable = "${local.eso_oidc_url}:aud"
       values   = ["sts.amazonaws.com"]
     }
   }
@@ -34,35 +37,36 @@ resource "aws_iam_role" "external_secrets" {
     Project     = var.project_name
     Environment = var.environment
   }
+
+  depends_on = [module.eks]
 }
 
 data "aws_iam_policy_document" "external_secrets_permissions" {
   statement {
-    sid    = "SecretsManagerAccess"
+    sid    = "SecretsManagerRead"
     effect = "Allow"
     actions = [
       "secretsmanager:GetSecretValue",
       "secretsmanager:DescribeSecret",
     ]
     resources = [
-      "arn:aws:secretsmanager:us-east-1:*:secret:${var.project_name}-*",
-      "arn:aws:secretsmanager:us-east-1:*:secret:ai-monitoring-platform-*",
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${local.name_prefix}*",
     ]
   }
 }
 
 resource "aws_iam_policy" "external_secrets" {
   name        = "${local.name_prefix}-external-secrets-policy"
-  description = "Allows External Secrets Operator to read aegisheal secrets from Secrets Manager"
+  description = "Allows External Secrets Operator to read AegisHeal secrets from Secrets Manager"
   policy      = data.aws_iam_policy_document.external_secrets_permissions.json
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "external_secrets" {
   role       = aws_iam_role.external_secrets.name
   policy_arn = aws_iam_policy.external_secrets.arn
-}
-
-output "external_secrets_irsa_role_arn" {
-  description = "ARN of the IRSA role for External Secrets Operator"
-  value       = aws_iam_role.external_secrets.arn
 }

@@ -25,8 +25,8 @@ output "cloudwatch_dashboard_url" {
 }
 
 output "lambda_function_arns" {
-  description = "ARNs of all deployed Lambda functions"
-  value       = module.lambda.lambda_arns
+  description = "ARNs of all deployed Lambda functions (empty map when enable_ai_remediation=false)"
+  value       = var.enable_ai_remediation ? module.lambda[0].lambda_arns : {}
 }
 
 output "oidc_provider_arn" {
@@ -47,4 +47,20 @@ output "anomaly_detector_irsa_role_arn" {
 output "remediation_engine_irsa_role_arn" {
   description = "ARN of the IRSA role for remediation-engine"
   value       = module.iam.remediation_engine_irsa_role_arn
+}
+
+output "external_secrets_irsa_role_arn" {
+  description = "ARN of the IRSA role for External Secrets Operator — annotate the external-secrets ServiceAccount with this value"
+  value       = aws_iam_role.external_secrets.arn
+}
+
+output "github_actions_deploy_role_arn" {
+  description = "ARN of the GitHub Actions OIDC deploy role — set as AWS_DEPLOY_ROLE_ARN in GitHub secrets"
+  value       = aws_iam_role.github_actions_deploy.arn
+}
+
+output "rds_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the RDS master password"
+  value       = module.rds.rds_secret_arn
+  sensitive   = true
 }

@@ -28,3 +28,21 @@ variable "project_name" {
   description = "Name of the project used for resource naming and tagging"
   type        = string
 }
+
+variable "node_desired_count" {
+  description = "Desired number of EKS worker nodes"
+  type        = number
+  default     = 2
+}
+
+variable "node_min_count" {
+  description = "Minimum number of EKS worker nodes"
+  type        = number
+  default     = 1
+}
+
+variable "node_max_count" {
+  description = "Maximum number of EKS worker nodes"
+  type        = number
+  default     = 5
+}
